@@ -1,0 +1,133 @@
+spring:
+  application:
+    name: finshield-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  jpa:
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  kafka:
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 10
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        spring.json.add.type.headers: false
+    consumer:
+      group-id: finshield-risk-scoring-v1
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JsonDeserializer
+        spring.json.value.default.type: com.finshield.backend.transaction.event.TransactionEvent
+        spring.json.trusted.packages: com.finshield.backend.transaction.event
+        spring.json.use.type.headers: false
+        isolation.level: read_committed
+    listener:
+      ack-mode: record
+      concurrency: ${KAFKA_CONSUMER_CONCURRENCY:3}
+
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+finshield:
+  aml:
+    screening:
+      fuzzy-threshold: ${AML_FUZZY_THRESHOLD:0.88}
+    patterns:
+      structuring-threshold: ${AML_STRUCTURING_THRESHOLD:10000}
+      structuring-minimum-count: ${AML_STRUCTURING_MINIMUM_COUNT:3}
+      mule-minimum-incoming: ${AML_MULE_MINIMUM_INCOMING:3}
+      mule-minimum-outgoing: ${AML_MULE_MINIMUM_OUTGOING:2}
+      mule-outflow-ratio: ${AML_MULE_OUTFLOW_RATIO:0.70}
+      rapid-movement-window: ${AML_RAPID_MOVEMENT_WINDOW:30m}
+      rapid-movement-ratio: ${AML_RAPID_MOVEMENT_RATIO:0.50}
+      round-amount-unit: ${AML_ROUND_AMOUNT_UNIT:1000}
+      round-amount-minimum-count: ${AML_ROUND_AMOUNT_MINIMUM_COUNT:3}
+      high-risk-countries: ${AML_HIGH_RISK_COUNTRIES:IRAN,NORTH KOREA,SYRIA,MYANMAR}
+  ml:
+    base-url: ${ML_SERVICE_BASE_URL:http://finshield-ml-service:8000}
+    timeout: ${ML_SERVICE_TIMEOUT:2s}
+  kafka:
+    fraud-alert-created:
+      partitions: ${FRAUD_ALERT_CREATED_PARTITIONS:3}
+      replicas: ${FRAUD_ALERT_CREATED_REPLICAS:1}
+      publish-delay: ${FRAUD_ALERT_PUBLISH_DELAY:2s}
+    transaction-incoming:
+      partitions: ${TRANSACTION_INCOMING_PARTITIONS:6}
+      replicas: ${TRANSACTION_INCOMING_REPLICAS:1}
+    transaction-risk-scored:
+      partitions: ${TRANSACTION_RISK_SCORED_PARTITIONS:6}
+      replicas: ${TRANSACTION_RISK_SCORED_REPLICAS:1}
+  alerts:
+    auto-create-critical-case: ${AUTO_CREATE_CRITICAL_CASE:false}
+  websocket:
+    allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGINS:http://localhost:4200}
+
+security:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-ttl: ${JWT_ACCESS_TOKEN_TTL:15m}
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:finshield;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+
+logging:
+  level:
+    com.finshield.backend: DEBUG
+    org.hibernate.SQL: INFO
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:finshield-dev-signing-key-change-before-production-2026}
