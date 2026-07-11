@@ -1,0 +1,12 @@
+[
+  "amount",
+  "averageCustomerAmount",
+  "transactionHour",
+  "isNewDevice",
+  "isNewBeneficiary",
+  "failedLoginCount",
+  "transactionsLast5Min",
+  "amountLast1Hour",
+  "customerRiskLevelEncoded",
+  "geoMismatch"
+]

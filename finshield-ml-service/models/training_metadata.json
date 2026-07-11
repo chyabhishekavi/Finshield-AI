@@ -1,0 +1,15 @@
+{
+  "modelVersion": "random-forest-synthetic-v1",
+  "trainedAt": "2026-06-22T20:42:01.837344+00:00",
+  "trainingRows": 25000,
+  "trainingFraudRate": 0.00532,
+  "metrics": {
+    "rocAuc": 0.626777,
+    "averagePrecision": 0.011846,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "testRows": 5000,
+    "testFraudRate": 0.0054
+  }
+}
