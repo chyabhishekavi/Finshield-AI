@@ -1,0 +1,4 @@
+export interface InvestigationCase{ id:string;caseNumber:string;caseType:string;customerId:string;customerNumber:string;customerName:string;primaryTransactionId:string;transactionReference:string;linkedAlertId:string|null;linkedAlertNumber:string|null;assignedToId:string|null;assignedToName:string|null;priority:string;status:string;summary:string;decision:string;createdAt:string;updatedAt:string;closedAt:string|null;version:number; }
+export interface CaseNote{id:string;caseId:string;noteText:string;createdById:string;createdByName:string;createdAt:string;internalOnly:boolean;}
+export interface CaseEvidence{id:string;caseId:string;evidenceType:string;fileName:string;fileUrl:string;description:string|null;uploadedById:string;uploadedByName:string;uploadedAt:string;}
+export interface CaseHistory{id:string;oldStatus:string;newStatus:string;changedByUserId:string;createdAt:string;}
