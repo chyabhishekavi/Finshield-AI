@@ -1,0 +1,15 @@
+POST http://localhost:8000/predict/fraud
+Content-Type: application/json
+
+{
+  "amount": 850000,
+  "averageCustomerAmount": 25000,
+  "transactionHour": 2,
+  "isNewDevice": true,
+  "isNewBeneficiary": true,
+  "failedLoginCount": 4,
+  "transactionsLast5Min": 6,
+  "amountLast1Hour": 950000,
+  "customerRiskLevelEncoded": 2,
+  "geoMismatch": true
+}

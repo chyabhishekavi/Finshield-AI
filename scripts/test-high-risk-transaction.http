@@ -1,0 +1,35 @@
+@baseUrl = http://localhost:8080/api
+@token = paste-admin-access-token-here
+
+### Login and copy data.accessToken into @token
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@finshield.ai",
+  "password": "Admin@123"
+}
+
+### High-risk transfer; transactionReference is generated when omitted
+POST {{baseUrl}}/transactions/ingest
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerNumber": "CUST1001",
+  "sourceAccountNumber": "ACC1001",
+  "destinationAccountNumber": "ACC9999",
+  "beneficiaryName": "Unknown Beneficiary",
+  "amount": 850000,
+  "currency": "INR",
+  "transactionType": "TRANSFER",
+  "channel": "MOBILE_BANKING",
+  "deviceId": "DEVICE-NEW-001",
+  "ipAddress": "103.20.44.15",
+  "geoLocation": "Unknown",
+  "initiatedAt": "2026-06-22T20:00:00Z"
+}
+
+### Expected after asynchronous processing: HIGH and CREATE_ALERT
+GET {{baseUrl}}/transactions?page=0&size=20
+Authorization: Bearer {{token}}

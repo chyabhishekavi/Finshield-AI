@@ -1,0 +1,26 @@
+@baseUrl = http://localhost:8080/api
+@token = paste-admin-access-token-here
+
+### Low-risk transfer using an established beneficiary and trusted device
+POST {{baseUrl}}/transactions/ingest
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerNumber": "CUST1001",
+  "sourceAccountNumber": "ACC1001",
+  "destinationAccountNumber": "ACC2002",
+  "beneficiaryName": "Priya Sharma",
+  "amount": 2500,
+  "currency": "INR",
+  "transactionType": "TRANSFER",
+  "channel": "MOBILE_BANKING",
+  "deviceId": "DEVICE-TRUSTED-001",
+  "ipAddress": "103.20.44.10",
+  "geoLocation": "Pune, India",
+  "initiatedAt": "2026-06-22T20:00:00Z"
+}
+
+### Expected after asynchronous processing: LOW and APPROVE
+GET {{baseUrl}}/transactions?page=0&size=20
+Authorization: Bearer {{token}}

@@ -1,0 +1,211 @@
+name: finshield
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_VERSION:-16-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-finshield}
+      POSTGRES_USER: ${POSTGRES_USER:-finshield}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - finshield-network
+
+  redis:
+    image: redis:${REDIS_VERSION:-7.4-alpine}
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a $$REDIS_PASSWORD ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - finshield-network
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:${CONFLUENT_VERSION:-7.7.1}
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-log:/var/lib/zookeeper/log
+    healthcheck:
+      test: ["CMD-SHELL", "cub zk-ready localhost:2181 30"]
+      interval: 10s
+      timeout: 10s
+      retries: 6
+      start_period: 20s
+    networks:
+      - finshield-network
+
+  kafka:
+    image: confluentinc/cp-kafka:${CONFLUENT_VERSION:-7.7.1}
+    restart: unless-stopped
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:29092,EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://${KAFKA_ADVERTISED_HOST:-localhost}:${KAFKA_PORT:-9092}
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "cub kafka-ready -b localhost:9092 1 30"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - finshield-network
+
+  finshield-backend:
+    build:
+      context: ./finshield-backend
+      dockerfile: Dockerfile
+    image: finshield-backend:${FINSHIELD_BACKEND_VERSION:-local}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-finshield}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-finshield}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-15m}
+      TRANSACTION_INCOMING_PARTITIONS: ${TRANSACTION_INCOMING_PARTITIONS:-6}
+      TRANSACTION_INCOMING_REPLICAS: ${TRANSACTION_INCOMING_REPLICAS:-1}
+      TRANSACTION_RISK_SCORED_PARTITIONS: ${TRANSACTION_RISK_SCORED_PARTITIONS:-6}
+      TRANSACTION_RISK_SCORED_REPLICAS: ${TRANSACTION_RISK_SCORED_REPLICAS:-1}
+      KAFKA_CONSUMER_CONCURRENCY: ${KAFKA_CONSUMER_CONCURRENCY:-3}
+      FRAUD_ALERT_CREATED_PARTITIONS: ${FRAUD_ALERT_CREATED_PARTITIONS:-3}
+      FRAUD_ALERT_CREATED_REPLICAS: ${FRAUD_ALERT_CREATED_REPLICAS:-1}
+      FRAUD_ALERT_PUBLISH_DELAY: ${FRAUD_ALERT_PUBLISH_DELAY:-2s}
+      AUTO_CREATE_CRITICAL_CASE: ${AUTO_CREATE_CRITICAL_CASE:-false}
+      WEBSOCKET_ALLOWED_ORIGINS: ${WEBSOCKET_ALLOWED_ORIGINS:-http://localhost:4200}
+      ML_SERVICE_BASE_URL: http://finshield-ml-service:8000
+      ML_SERVICE_TIMEOUT: ${ML_SERVICE_TIMEOUT:-2s}
+      AML_FUZZY_THRESHOLD: ${AML_FUZZY_THRESHOLD:-0.88}
+      AML_STRUCTURING_THRESHOLD: ${AML_STRUCTURING_THRESHOLD:-10000}
+      AML_STRUCTURING_MINIMUM_COUNT: ${AML_STRUCTURING_MINIMUM_COUNT:-3}
+      AML_MULE_MINIMUM_INCOMING: ${AML_MULE_MINIMUM_INCOMING:-3}
+      AML_MULE_MINIMUM_OUTGOING: ${AML_MULE_MINIMUM_OUTGOING:-2}
+      AML_MULE_OUTFLOW_RATIO: ${AML_MULE_OUTFLOW_RATIO:-0.70}
+      AML_RAPID_MOVEMENT_WINDOW: ${AML_RAPID_MOVEMENT_WINDOW:-30m}
+      AML_RAPID_MOVEMENT_RATIO: ${AML_RAPID_MOVEMENT_RATIO:-0.50}
+      AML_ROUND_AMOUNT_UNIT: ${AML_ROUND_AMOUNT_UNIT:-1000}
+      AML_ROUND_AMOUNT_MINIMUM_COUNT: ${AML_ROUND_AMOUNT_MINIMUM_COUNT:-3}
+      AML_HIGH_RISK_COUNTRIES: ${AML_HIGH_RISK_COUNTRIES:-IRAN,NORTH KOREA,SYRIA,MYANMAR}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/v3/api-docs"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - finshield-network
+
+  finshield-ml-service:
+    build:
+      context: ./finshield-ml-service
+      dockerfile: Dockerfile
+    image: finshield-ml-service:${FINSHIELD_ML_VERSION:-local}
+    restart: unless-stopped
+    environment:
+      SERVICE_NAME: finshield-ml-service
+      SERVICE_VERSION: ${FINSHIELD_ML_VERSION:-local}
+      MODEL_PATH: /app/models/fraud_model.joblib
+    ports:
+      - "${ML_SERVICE_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    read_only: true
+    tmpfs:
+      - /tmp
+    networks:
+      - finshield-network
+
+  finshield-ui:
+    build:
+      context: ./finshield-ui
+      dockerfile: Dockerfile
+    image: finshield-ui:${FINSHIELD_UI_VERSION:-local}
+    restart: unless-stopped
+    depends_on:
+      finshield-backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+    networks:
+      - finshield-network
+
+volumes:
+  postgres-data:
+  redis-data:
+  zookeeper-data:
+  zookeeper-log:
+  kafka-data:
+
+networks:
+  finshield-network:
+    driver: bridge
