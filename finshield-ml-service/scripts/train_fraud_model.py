@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import joblib
@@ -158,7 +158,7 @@ def save_artifacts(
     fraud_rate: float,
 ) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    trained_at = datetime.now(UTC).isoformat()
+    trained_at = datetime.now(timezone.utc).isoformat()
     artifact = {
         "model": model,
         "version": MODEL_VERSION,

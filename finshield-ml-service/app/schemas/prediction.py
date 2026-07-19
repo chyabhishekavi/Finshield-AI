@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import Enum
 
 from typing import Any
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class RiskBand(StrEnum):
+class RiskBand(str, Enum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
 
 
-class TransactionType(StrEnum):
+class TransactionType(str, Enum):
     ACCOUNT_TRANSFER = "ACCOUNT_TRANSFER"
     CARD_PURCHASE = "CARD_PURCHASE"
     CASH_DEPOSIT = "CASH_DEPOSIT"
@@ -24,7 +24,7 @@ class TransactionType(StrEnum):
     REFUND = "REFUND"
 
 
-class TransactionChannel(StrEnum):
+class TransactionChannel(str, Enum):
     MOBILE_BANKING = "MOBILE_BANKING"
     INTERNET_BANKING = "INTERNET_BANKING"
     ATM = "ATM"
